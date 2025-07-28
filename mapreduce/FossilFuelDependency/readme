@@ -1,0 +1,5 @@
+3. Fossil Fuel Dependency Analysis
+
+Groups by: Season + Demand Level (e.g., "WINTER_HIGH", "SUMMER_LOW")
+Calculates: Fossil fuel dependency percentage and breakdown by fuel type
+Output: Dependency ratios across different seasons and demand conditions

@@ -1,0 +1,5 @@
+Base Load vs Peak Load Source Analysis
+
+Groups by: BASE_LOAD (22:00-06:00) vs PEAK_LOAD (07:00-21:00)
+Calculates: Average generation from each source type during base/peak hours
+Output: Shows which energy sources handle baseline vs peak demand
