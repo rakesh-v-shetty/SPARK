@@ -1,0 +1,15 @@
+hdfs dfs -cat /labelout/rde/part-r-00000 > rde_raw.csv
+echo "time,generation biomass,generation geothermal,generation hydro pumped storage consumption,generation hydro run-of-river and poundage,generation hydro water reservoir,generation marine,generation nuclear,generation other renewable,generation solar,generation waste,generation wind offshore, generation wind onshore" | cat - renewable_monthly_raw.csv > renewable_monthly.csv
+docker cp namenode:/root/renewable/monthlyenergy/rme.csv D:\VI\BDT\LABEL\mapreduce\renewable\monthlyenergy
+
+
+
+hdfs dfs -cat /labelout/nrde/part-r-00000 > nrde_raw.csv
+echo "time,generation fossil brown coal/lignite,generation fossil coal-derived gas,generation fossil gas,generation fossil hard coal,generation fossil oil,generation fossil oil shale,generation fossil peat" | cat - nrde_raw.csv > nrde.csv
+docker cp namenode:/root/renewable/monthlyenergy/nrde.csv D:\VI\BDT\LABEL\mapreduce\renewable\monthlyenergy
+
+hdfs dfs -cat /labelout/wla/part-r-00000> wla_raw.csv
+echo "time,load actual" | cat - wla_raw.csv > wla.csv
+docker cp namenode:/root/LoadActual/weeklyload/wla.csv D:\VI\BDT\LABEL\mapreduce\LoadActual\weeklyload
+
+
