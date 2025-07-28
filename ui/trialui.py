@@ -1,0 +1,1571 @@
+import streamlit as st
+import pandas as pd
+import numpy as np
+import plotly.express as px
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+from datetime import datetime, timedelta
+import seaborn as sns
+import matplotlib.pyplot as plt
+import time
+import requests
+import re
+
+# Configure page
+st.set_page_config(
+    page_title="SPARK - Sustainable Power Analysis & Renewable Kinetics",
+    page_icon="⚡",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+st.markdown("""
+<style>
+    .main-header {
+        font-size: 2.5rem;
+        font-weight: 600;
+        text-align: center;
+        color: #e0e0e0;
+        margin-bottom: 2rem;
+    }
+
+    .section-header {
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: #cccccc;
+        margin: 1.5rem 0 1rem 0;
+        border-bottom: 1px solid #444;
+        padding-bottom: 0.25rem;
+    }
+
+    .metric-card {
+        background-color: #1e1e1e;
+        padding: 1.25rem;
+        border-radius: 8px;
+        border-left: 4px solid #555;
+        margin: 1rem 0;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+
+    .info-box {
+        background-color: #262626;
+        padding: 1.25rem;
+        border-radius: 8px;
+        border: 1px solid #3a3a3a;
+        margin: 1rem 0;
+    }
+
+    .info-box h2, .info-box h3 {
+        color: #e0e0e0;
+        margin-top: 1.5rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .info-box h2:first-child {
+        margin-top: 0;
+    }
+
+    .info-box p {
+        color: #cccccc;
+        line-height: 1.6;
+        margin-bottom: 1rem;
+    }
+
+    .info-box ul {
+        color: #cccccc;
+        line-height: 1.6;
+        margin-bottom: 1rem;
+        padding-left: 1.5rem;
+    }
+
+    .info-box li {
+        margin-bottom: 0.5rem;
+    }
+
+    .info-box strong {
+        color: #00b894;
+        font-weight: 600;
+    }
+
+    .stSelectbox > div > div {
+        background-color: #1e1e1e !important;
+        border: 1px solid #3a3a3a !important;
+        color: #e0e0e0 !important;
+    }
+
+    .stDateInput > div > div {
+        background-color: #1e1e1e !important;
+        border: 1px solid #3a3a3a !important;
+        color: #e0e0e0 !important;
+    }
+
+    .stCheckbox > div > div {
+        background-color: #1e1e1e !important;
+        border: 1px solid #3a3a3a !important;
+        color: #e0e0e0 !important;
+    }
+
+    .stCheckbox > div > div > label {
+        color: #e0e0e0 !important;
+        font-size: 0.9rem !important;
+    }
+
+    .metric-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        margin: 1rem 0;
+    }
+
+    .metric-card-compact {
+        background-color: #1e1e1e;
+        padding: 0.75rem;
+        border-radius: 6px;
+        border-left: 3px solid #555;
+        margin: 0.5rem 0;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+    /* System Monitor Specific Styles */
+    .monitor-card {
+        background-color: #1e1e1e; padding: 1rem; border-radius: 12px;
+        border: 1px solid #3a3a3a; box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        height: 100%; display: flex; flex-direction: column;
+    }
+    .monitor-card-header {
+        font-size: 1.25rem; font-weight: 600; color: #e0e0e0;
+        margin-bottom: 0.5rem; padding-bottom: 0.5rem; border-bottom: 1px solid #444;
+    }
+    .metric-row {
+        display: flex; justify-content: space-between; align-items: center;
+        padding: 0.4rem 0.2rem; border-bottom: 1px solid #2a2a2a;
+    }
+    .metric-row:last-child { border-bottom: none; }
+    .metric-label { font-size: 0.9rem; color: #cccccc; }
+    .metric-value {
+        font-size: 1.0rem; font-weight: 500; color: #e0e0e0;
+        background-color: #2a3f54; padding: 0.2rem 0.5rem; border-radius: 5px;
+    }
+    .connection-error {
+        background-color: #ff4444; color: white; padding: 1rem;
+        border-radius: 8px; text-align: left;
+    }
+    .stButton>button { width: 100%; }
+</style>
+""", unsafe_allow_html=True)
+
+# Load renewable and non-renewable energy data
+@st.cache_data
+def load_energy_data():
+    """Load energy data from CSV files"""
+    try:
+        # Load daily renewable data
+        daily_renewable = pd.read_csv('./mapreduce/renewable/dailyenergy/daily.csv')
+        daily_renewable['Date'] = pd.to_datetime(daily_renewable['time'], format='%d-%m-%y')
+        
+        # Load weekly renewable data
+        weekly_renewable = pd.read_csv('./mapreduce/renewable/weeklyenergy/weekly.csv')
+        
+        # Load monthly renewable data
+        monthly_renewable = pd.read_csv('./mapreduce/renewable/monthlyenergy/monthly.csv')
+        
+        # Load daily non-renewable data
+        daily_nonrenewable = pd.read_csv('./mapreduce/nonrenewable/dailyenergy/daily.csv')
+        daily_nonrenewable['Date'] = pd.to_datetime(daily_nonrenewable['time'], format='%d-%m-%y')
+        
+        # Load weekly non-renewable data
+        weekly_nonrenewable = pd.read_csv('./mapreduce/nonrenewable/weeklyenergy/weekly.csv')
+        
+        # Load monthly non-renewable data
+        monthly_nonrenewable = pd.read_csv('./mapreduce/nonrenewable/monthlyenergy/monthly.csv')
+        
+        # Load fossil fuel dependency data
+        fossil_fuel_dependency = pd.read_csv('./mapreduce/FossilFuelDependency/ffd.csv')
+        # Strip whitespace from column names to handle any leading/trailing spaces
+        fossil_fuel_dependency.columns = fossil_fuel_dependency.columns.str.strip()
+        
+        return {
+            'daily_renewable': daily_renewable,
+            'weekly_renewable': weekly_renewable,
+            'monthly_renewable': monthly_renewable,
+            'daily_nonrenewable': daily_nonrenewable,
+            'weekly_nonrenewable': weekly_nonrenewable,
+            'monthly_nonrenewable': monthly_nonrenewable,
+            'fossil_fuel_dependency': fossil_fuel_dependency
+        }
+    except FileNotFoundError as e:
+        st.error(f"Error loading data files: {e}")
+        return None
+
+# # Generate sample data for ML analysis
+# @st.cache_data
+# def generate_sample_ml_data():
+#     # Generate sample load forecast data
+#     dates = pd.date_range(start='2015-01-01', end='2018-12-31', freq='D')
+#     load_data = pd.DataFrame({
+#         'Date': dates,
+#         'Actual_Load': np.random.normal(1000, 200, len(dates)) + 100 * np.sin(np.arange(len(dates)) * 2 * np.pi / 365),
+#         'Predicted_Load': np.random.normal(1000, 180, len(dates)) + 100 * np.sin(np.arange(len(dates)) * 2 * np.pi / 365),
+#         'Temperature': np.random.normal(20, 10, len(dates)),
+#         'Humidity': np.random.uniform(30, 90, len(dates))
+#     })
+#     return load_data
+
+# Load data
+energy_data = load_energy_data()
+ml_load_data = pd.read_csv('./data/forecast.csv')
+
+# Define renewable energy columns
+RENEWABLE_COLUMNS = [
+    'generation biomass',
+    'generation geothermal',
+    'generation hydro pumped storage consumption',
+    'generation hydro run-of-river and poundage',
+    'generation hydro water reservoir',
+    'generation marine',
+    'generation nuclear',
+    'generation other renewable',
+    'generation solar',
+    'generation waste',
+    'generation wind offshore',
+    ' generation wind onshore'  # Note the leading space
+]
+
+# Define non-renewable energy columns
+NONRENEWABLE_COLUMNS = [
+    'generation fossil brown coal/lignite',
+    'generation fossil coal-derived gas',
+    'generation fossil gas',
+    'generation fossil hard coal',
+    'generation fossil oil',
+    'generation fossil oil shale',
+    'generation fossil peat'
+]
+
+# Define fossil fuel dependency columns
+FOSSIL_FUEL_DEPENDENCY_COLUMNS = [
+    'avgLoad',
+    'avgTotalFossil',  # Now without leading space after stripping
+    'avgTotalGeneration',
+    'fossilDependencyPercent',
+    'avgBrownCoal',
+    'avgCoalGas',
+    'avgNaturalGas',
+    'avgHardCoal',
+    'avgOil',
+    'avgOilShale',
+    'avgPeat',
+    'brownCoalPercent',
+    'coalGasPercent',
+    'naturalGasPercent',
+    'hardCoalPercent',
+    'oilPercent',
+    'count'
+]
+# --- OpenHardwareMonitor Integration Class ---
+class OHMWebMonitor:
+    def __init__(self, host='localhost', port=8085):
+        self.data_url = f'http://{host}:{port}/data.json'
+        self.connected = False
+
+    def get_sensor_data(self):
+        try:
+            response = requests.get(self.data_url, timeout=2)
+            if response.status_code == 200:
+                self.connected = True
+                return response.json()
+            self.connected = False
+            return None
+        except requests.exceptions.RequestException:
+            self.connected = False
+            return None
+
+    def parse_sensors(self, data):
+        sensors = {
+            'cpu': {'temperature': 0, 'load': 0, 'power': 0, 'name': 'CPU'},
+            'gpu': {'temperature': 0, 'load': 0, 'power': 0, 'name': 'GPU'},
+            'ram': {'load': 0, 'used': 0, 'available': 0, 'total': 0},
+            'storage': {'temperature': 0, 'used_space': 0, 'name': 'Storage'}
+        }
+        if not data: return sensors
+
+        def extract_number(value_str):
+            if not value_str: return 0.0
+            match = re.search(r'([\d.]+)', str(value_str))
+            return float(match.group(1)) if match else 0.0
+
+        root_node = data
+        if 'Children' in root_node and len(root_node['Children']) > 0:
+            root_node = root_node['Children'][0] 
+
+        for hardware in root_node.get('Children', []):
+            hw_img = hardware.get('ImageURL', '').lower()
+
+            if 'cpu' in hw_img:
+                sensors['cpu']['name'] = hardware.get('Text', 'CPU')
+                for group in hardware.get('Children', []):
+                    group_text = group.get('Text', '').lower()
+                    if group_text == 'temperatures':
+                        for sensor in group.get('Children', []):
+                            if 'package' in sensor.get('Text', '').lower():
+                                sensors['cpu']['temperature'] = extract_number(sensor.get('Value'))
+                    elif group_text == 'load':
+                        for sensor in group.get('Children', []):
+                            if 'total' in sensor.get('Text', '').lower():
+                                sensors['cpu']['load'] = extract_number(sensor.get('Value'))
+                    elif group_text == 'powers':
+                        for sensor in group.get('Children', []):
+                            if 'package' in sensor.get('Text', '').lower():
+                                sensors['cpu']['power'] = extract_number(sensor.get('Value'))
+            
+            if 'ram' in hw_img:
+                for group in hardware.get('Children', []):
+                    group_text = group.get('Text', '').lower()
+                    if group_text == 'load':
+                        for sensor in group.get('Children', []):
+                            if 'memory' in sensor.get('Text', '').lower():
+                                sensors['ram']['load'] = extract_number(sensor.get('Value'))
+                    elif group_text == 'data':
+                        for sensor in group.get('Children', []):
+                            sensor_text = sensor.get('Text', '').lower()
+                            if 'used memory' in sensor_text:
+                                sensors['ram']['used'] = extract_number(sensor.get('Value'))
+                            elif 'available memory' in sensor_text:
+                                sensors['ram']['available'] = extract_number(sensor.get('Value'))
+                if sensors['ram']['used'] > 0 and sensors['ram']['available'] > 0:
+                    sensors['ram']['total'] = sensors['ram']['used'] + sensors['ram']['available']
+
+            if 'hdd' in hw_img:
+                sensors['storage']['name'] = hardware.get('Text', 'Storage')
+                for group in hardware.get('Children', []):
+                    group_text = group.get('Text', '').lower()
+                    if group_text == 'temperatures':
+                        for sensor in group.get('Children', []):
+                            if 'temperature' in sensor.get('Text', '').lower():
+                                sensors['storage']['temperature'] = extract_number(sensor.get('Value'))
+                    elif group_text == 'load':
+                        for sensor in group.get('Children', []):
+                            if 'used space' in sensor.get('Text', '').lower():
+                                sensors['storage']['used_space'] = extract_number(sensor.get('Value'))
+            
+            if 'gpu' in hw_img:
+                sensors['gpu']['name'] = hardware.get('Text', 'GPU')
+                for group in hardware.get('Children', []):
+                    group_text = group.get('Text', '').lower()
+                    if group_text == 'temperatures':
+                        for sensor in group.get('Children', []):
+                            if 'core' in sensor.get('Text', '').lower():
+                                sensors['gpu']['temperature'] = extract_number(sensor.get('Value'))
+                    elif group_text == 'load':
+                        for sensor in group.get('Children', []):
+                            if 'core' in sensor.get('Text', '').lower():
+                                sensors['gpu']['load'] = extract_number(sensor.get('Value'))
+                    elif group_text == 'powers':
+                        for sensor in group.get('Children', []):
+                            if 'total' in sensor.get('Text', '').lower():
+                                sensors['gpu']['power'] = extract_number(sensor.get('Value'))
+        return sensors
+
+
+# --- UI Functions for System Monitor ---
+def create_gauge(value, title, max_val=100, suffix='%', color='#00b894'):
+    fig = go.Figure(go.Indicator(
+        mode="gauge+number", value=value,
+        title={'text': title, 'font': {'size': 16, 'color': '#cccccc'}},
+        gauge={
+            'axis': {'range': [None, max_val], 'tickwidth': 1, 'tickcolor': "darkblue"},
+            'bar': {'color': color}, 'bgcolor': "rgba(0,0,0,0.2)",
+            'borderwidth': 1, 'bordercolor': "#444",
+        },
+        number={'suffix': suffix, 'font': {'size': 28, 'color': '#e0e0e0'}}
+    ))
+    fig.update_layout(
+        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+        height=220, margin=dict(l=20, r=20, t=50, b=20)
+    )
+    return fig
+
+def display_system_monitor():
+    st.markdown('<h1 class="main-header">🖥️ System Hardware Monitor</h1>', unsafe_allow_html=True)
+    if 'auto_refresh' not in st.session_state:
+        st.session_state.auto_refresh = True
+    if 'last_refresh_time' not in st.session_state:
+        st.session_state.last_refresh_time = time.time()
+    monitor = OHMWebMonitor()
+    st.markdown("---")
+    cols = st.columns([2, 2, 1, 1])
+    last_refreshed_str = datetime.fromtimestamp(st.session_state.last_refresh_time).strftime('%H:%M:%S')
+    cols[0].markdown(f"🕒 **Last Update:** `{last_refreshed_str}`")
+    with cols[1]:
+        if st.session_state.auto_refresh: st.success("🟢 Live Refresh is ON")
+        else: st.warning("🟡 Live Refresh is OFF")
+    with cols[2]:
+        if st.button("🔄 Refresh"):
+            st.session_state.last_refresh_time = time.time()
+            st.rerun()
+    with cols[3]:
+        st.session_state.auto_refresh = st.toggle("Live", value=st.session_state.get('auto_refresh', True), key="auto_refresh_toggle")
+    st.markdown("---")
+    data = monitor.get_sensor_data()
+    if not monitor.connected or not data:
+        st.markdown("""
+        <div class="connection-error">
+            <strong>❌ Connection Failed: Could not connect to Open Hardware Monitor.</strong><br><br>
+            <strong>Troubleshooting Steps:</strong>
+            <ol>
+                <li><strong>Download and Install:</strong> <a href="https://openhardwaremonitor.org/downloads/" target="_blank" style="color: white;">Open Hardware Monitor</a></li>
+                <li><strong>Run as Administrator:</strong> Right-click the .exe and select "Run as administrator".</li>
+                <li><strong>Enable Web Server:</strong> In the app, go to Options → Remote Web Server → Check "Run".</li>
+                <li><strong>Check Firewall:</strong> Ensure your firewall is not blocking the connection on port 8085.</li>
+            </ol>
+        </div>
+        """, unsafe_allow_html=True)
+        return
+    sensors = monitor.parse_sensors(data)
+    cols = st.columns(4)
+    with cols[0]: st.plotly_chart(create_gauge(sensors['cpu']['load'], "CPU Load", color='#6c5ce7'), use_container_width=True)
+    with cols[1]: st.plotly_chart(create_gauge(sensors['cpu']['temperature'], "CPU Temp", suffix='°C', color="#f72e2e"), use_container_width=True)
+    with cols[2]: st.plotly_chart(create_gauge(sensors['ram']['load'], "RAM Usage", color="#0041ce"), use_container_width=True)
+    with cols[3]: st.plotly_chart(create_gauge(sensors['storage']['used_space'], "Disk Usage", color="#b9fc00"), use_container_width=True)
+    st.markdown("<br>", unsafe_allow_html=True)
+    cols = st.columns(4)
+    with cols[0]:
+        st.markdown(f"""
+        <div class="monitor-card"><div class="monitor-card-header">🔥 {sensors["cpu"]["name"]}</div>
+            <div class="metric-row"><span class="metric-label">🌡️ Temperature</span> <span class="metric-value">{sensors['cpu']['temperature']:.1f} °C</span></div>
+            <div class="metric-row"><span class="metric-label">📊 Load</span> <span class="metric-value">{sensors['cpu']['load']:.1f} %</span></div>
+            <div class="metric-row"><span class="metric-label">⚡ Power</span> <span class="metric-value">{sensors['cpu']['power']:.1f} W</span></div>
+        </div>""", unsafe_allow_html=True)
+    with cols[1]:
+        st.markdown(f"""
+        <div class="monitor-card"><div class="monitor-card-header">💾 Memory (RAM)</div>
+            <div class="metric-row"><span class="metric-label">📊 Usage</span> <span class="metric-value">{sensors['ram']['load']:.1f} %</span></div>
+            <div class="metric-row"><span class="metric-label">💿 Used</span> <span class="metric-value">{sensors['ram']['used']:.1f} GB</span></div>
+            <div class="metric-row"><span class="metric-label">🗃️ Total</span> <span class="metric-value">{sensors['ram']['total']:.1f} GB</span></div>
+        </div>""", unsafe_allow_html=True)
+    with cols[2]:
+        st.markdown(f"""
+        <div class="monitor-card"><div class="monitor-card-header">💿 {sensors["storage"]["name"]}</div>
+            <div class="metric-row"><span class="metric-label">🌡️ Temperature</span> <span class="metric-value">{sensors['storage']['temperature']:.1f} °C</span></div>
+            <div class="metric-row"><span class="metric-label">📊 Used Space</span> <span class="metric-value">{sensors['storage']['used_space']:.1f} %</span></div>
+        </div>""", unsafe_allow_html=True)
+    with cols[3]:
+        if sensors['gpu']['load'] > 0 or sensors['gpu']['temperature'] > 0:
+            st.markdown(f"""
+            <div class="monitor-card"><div class="monitor-card-header">🎮 {sensors["gpu"]["name"]}</div>
+                <div class="metric-row"><span class="metric-label">🌡️ Temperature</span> <span class="metric-value">{sensors['gpu']['temperature']:.1f} °C</span></div>
+                <div class="metric-row"><span class="metric-label">📊 Load</span> <span class="metric-value">{sensors['gpu']['load']:.1f} %</span></div>
+                <div class="metric-row"><span class="metric-label">⚡ Power</span> <span class="metric-value">{sensors['gpu']['power']:.1f} W</span></div>
+            </div>""", unsafe_allow_html=True)
+        else:
+            st.markdown("""
+            <div class="monitor-card"><div class="monitor-card-header">🎮 GPU</div>
+                <div style="text-align: center; padding-top: 2rem; color: #666;">No compatible GPU detected.</div>
+            </div>""", unsafe_allow_html=True)
+    if st.session_state.auto_refresh:
+        time.sleep(2)
+        st.session_state.last_refresh_time = time.time()
+        st.rerun()
+# Sidebar navigation
+st.sidebar.title("Navigation")
+page = st.sidebar.selectbox(
+    "Choose a section:",
+    ["Home", "📊 Data Analysis", "👾 ML Analysis", "🖥️ System Monitor"] # Add this new option
+)
+
+if page == "Home":
+    st.markdown('<h1 class="main-header">⚡ SPARK – Sustainable Power Analytics and Renewable Kinetics</h1>', unsafe_allow_html=True)
+    
+    # Project Overview Section
+    st.markdown("""
+    <div class="info-box">
+        <h2>Project Overview</h2>
+        <p>
+            This platform provides comprehensive tools for energy forecasting and deep analytics of both renewable and non-renewable energy sources, leveraging machine learning for sustainable power insights.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Key Features Section
+    st.markdown('<h3 style="color: #e0e0e0; margin-top: 1.5rem; margin-bottom: 0.5rem;">Key Features</h3>', unsafe_allow_html=True)
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("""
+        - **Load Forecasting:** Accurate energy demand prediction using ML algorithms
+        - **Renewable Energy Analysis:** Insights into solar, wind, and other renewable sources
+        - **Non-Renewable Analysis:** Evaluation of coal, gas, oil, and nuclear energy generation
+        """)
+    
+    with col2:
+        st.markdown("""
+        - **Correlation Analysis:** Examine interdependencies between key energy metrics
+        - **Seasonal Trends:** Discover fossil fuel usage patterns across different seasons
+        """)
+    
+    # Objectives Section
+    st.markdown('<h3 style="color: #e0e0e0; margin-top: 1.5rem; margin-bottom: 0.5rem;">Objectives</h3>', unsafe_allow_html=True)
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("""
+        - Enhance grid efficiency through predictive analytics
+        - Encourage renewable adoption with actionable insights
+        """)
+    
+    with col2:
+        st.markdown("""
+        - Reduce fossil dependency via informed planning
+        - Support energy policy with evidence-based analysis
+        """)
+
+    # Stats Overview
+    col1, col2, col3, col4 = st.columns(4)
+
+    with col1:
+        st.markdown("""
+        <div class="metric-card">
+            <h4>Historical Data</h4>
+            <h2>35K+</h2>
+            <p>Hours analyzed</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with col2:
+        st.markdown("""
+        <div class="metric-card">
+            <h4>Forecast Accuracy</h4>
+            <h2>95.2%</h2>
+            <p>Avg. model performance</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+    with col3:
+        st.markdown("""
+        <div class="metric-card">
+            <h4>Renewable Share</h4>
+            <h2>34.7%</h2>
+            <p>Current clean energy usage</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with col4:
+        st.markdown("""
+        <div class="metric-card">
+            <h4>Peak Load in an hour</h4>
+            <h2>41,015 MW</h2>
+            <p>Max recorded demand</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+# DATA ANALYSIS PAGE
+elif page == "📊 Data Analysis":
+    st.markdown('<h1 class="main-header">📊 Data Analysis Dashboard</h1>', unsafe_allow_html=True)
+    
+    st.markdown("""
+    <div class="info-box">
+        <h2>🔍 Data Analysis Overview</h2>
+        <p>Comprehensive analysis of energy generation patterns, renewable vs non-renewable sources, and seasonal dependencies:</p>
+        <ul>
+            <li><strong>Renewable Energy:</strong> Solar, wind, and other clean energy sources analysis</li>
+            <li><strong>Non-Renewable Energy:</strong> Coal, natural gas, nuclear, and oil generation patterns</li>
+            <li><strong>Seasonal Analysis:</strong> Fossil fuel dependency across different seasons</li>
+            <li><strong>Comparative Studies:</strong> Interactive comparison between different energy sources</li>
+        </ul>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Check if data is loaded
+    if energy_data is None:
+        st.error("❌ Unable to load energy data. Please check if the CSV files are available in the correct directory structure.")
+        st.stop()
+    
+    # Analysis type selection
+    st.markdown('<h2 class="section-header">⚙️ Analysis Configuration</h2>', unsafe_allow_html=True)
+    
+    analysis_type = st.selectbox(
+        "Choose Analysis Type:",
+        ["Renewables", "Non-Renewables", "Fossil Fuel Dependency"]
+    )
+    
+    # Time range selection with validation (only for Renewables and Non-Renewables)
+    if analysis_type in ["Renewables", "Non-Renewables"]:
+        col1, col2 = st.columns(2)
+        with col1:
+            start_date = st.date_input("Start Date", datetime(2015, 1, 1), key="data_start")
+        with col2:
+            end_date = st.date_input("End Date", datetime(2018, 12, 31), key="data_end")
+        
+        # Validate date range
+        min_date = datetime(2015, 1, 1).date()
+        max_date = datetime(2018, 12, 31).date()
+        
+        if start_date < min_date or end_date > max_date or start_date > max_date or end_date < min_date:
+            st.markdown("""
+            <div style="background-color: #ff4444; color: white; padding: 1rem; border-radius: 8px; margin: 1rem 0;">
+                <strong>⚠️ Invalid Date Range</strong><br>
+                Please choose dates between <strong>01/01/2015</strong> and <strong>31/12/2018</strong>
+            </div>
+            """, unsafe_allow_html=True)
+            st.stop()
+        
+        # Validate that start_date is before end_date
+        if start_date >= end_date:
+            st.markdown("""
+            <div style="background-color: #ff4444; color: white; padding: 1rem; border-radius: 8px; margin: 1rem 0;">
+                <strong>⚠️ Invalid Date Range</strong><br>
+                Start date must be <strong>before</strong> end date
+            </div>
+            """, unsafe_allow_html=True)
+            st.stop()
+    
+    if analysis_type == "Renewables":
+        st.markdown('<h2 class="section-header">🌱 Renewable Energy Analysis</h2>', unsafe_allow_html=True)
+        
+        # Chart type selection
+        col1, col2 = st.columns(2)
+        with col1:
+            chart_type = st.selectbox("Chart Type:", ["Line Chart", "Stacked Area Chart", "Pie Chart"])
+        with col2:
+            time_resolution = st.selectbox("Time Resolution:", ["Daily", "Weekly", "Monthly"])
+        
+        # Get the appropriate dataset and convert time to Date
+        if time_resolution == "Daily":
+            renewable_df = energy_data['daily_renewable']
+            # Date column already created in load_energy_data()
+        elif time_resolution == "Weekly":
+            renewable_df = energy_data['weekly_renewable']
+            # Convert weekly time format (e.g., "2015-W01") to datetime
+            # Use a simpler approach: extract year and week, then create datetime
+            def parse_iso_week(week_str):
+                year, week = week_str.split('-W')
+                # Create a datetime for the first day of the year, then add weeks
+                first_day = pd.Timestamp(year=int(year), month=1, day=1)
+                # Find the first Monday of the year
+                while first_day.weekday() != 0:  # Monday is 0
+                    first_day += pd.Timedelta(days=1)
+                # Add the weeks
+                return first_day + pd.Timedelta(weeks=int(week)-1)
+            
+            renewable_df['Date'] = renewable_df['time'].apply(parse_iso_week)
+        else:  # Monthly
+            renewable_df = energy_data['monthly_renewable']
+            # Convert monthly time format (e.g., "2015-01") to datetime
+            renewable_df['Date'] = pd.to_datetime(renewable_df['time'] + '-01', format='%Y-%m-%d')
+        
+        # Column selection
+        st.markdown('<h3 class="section-header">📋 Select Energy Sources</h3>', unsafe_allow_html=True)
+        
+        # Filter columns that exist in the dataset
+        available_columns = [col for col in RENEWABLE_COLUMNS if col in renewable_df.columns]
+        
+        if not available_columns:
+            st.error("❌ No renewable energy columns found in the dataset.")
+            st.stop()
+        
+        # Initialize session state for selections
+        if 'renewable_selections' not in st.session_state:
+            st.session_state.renewable_selections = []
+        
+        # Add Select All and Clear All buttons
+        st.markdown("<br>", unsafe_allow_html=True)  # Add spacing to move buttons down
+        col1, col2, col3, col4 = st.columns([1, 1, 1, 1])
+        with col1:
+            if st.button("Select All", key="select_all_renewable"):
+                st.session_state.renewable_selections = available_columns.copy()
+                st.rerun()
+        with col2:
+            if st.button("Clear All", key="clear_all_renewable"):
+                st.session_state.renewable_selections = []
+                st.rerun()
+        with col3:
+            pass  # Empty column for symmetry
+        with col4:
+            pass  # Empty column for symmetry
+        
+        # Use a more organized grid layout for checkboxes
+        if len(available_columns) <= 6:
+            # For 6 or fewer columns, use 3 columns
+            col1, col2, col3 = st.columns(3)
+            
+            for i, column in enumerate(available_columns):
+                with [col1, col2, col3][i % 3]:
+                    is_checked = column in st.session_state.renewable_selections
+                    if st.checkbox(column.replace('generation ', '').title(), 
+                                 value=is_checked, 
+                                 key=f"renewable_{i}"):
+                        if column not in st.session_state.renewable_selections:
+                            st.session_state.renewable_selections.append(column)
+                    else:
+                        if column in st.session_state.renewable_selections:
+                            st.session_state.renewable_selections.remove(column)
+        else:
+            # For more than 6 columns, use 4 columns
+            col1, col2, col3, col4 = st.columns(4)
+            
+            for i, column in enumerate(available_columns):
+                with [col1, col2, col3, col4][i % 4]:
+                    is_checked = column in st.session_state.renewable_selections
+                    if st.checkbox(column.replace('generation ', '').title(), 
+                                 value=is_checked, 
+                                 key=f"renewable_{i}"):
+                        if column not in st.session_state.renewable_selections:
+                            st.session_state.renewable_selections.append(column)
+                    else:
+                        if column in st.session_state.renewable_selections:
+                            st.session_state.renewable_selections.remove(column)
+        
+        selected_columns = st.session_state.renewable_selections
+        
+        if not selected_columns:
+            st.warning("⚠️ Please select at least one energy source to analyze.")
+            st.stop()
+        
+        # Filter data by date range
+        mask = (renewable_df['Date'] >= pd.to_datetime(start_date)) & (renewable_df['Date'] <= pd.to_datetime(end_date))
+        filtered_df = renewable_df.loc[mask]
+        
+        # Create visualizations
+        if chart_type == "Line Chart":
+            fig = go.Figure()
+            
+            for column in selected_columns:
+                fig.add_trace(go.Scatter(
+                    x=filtered_df['Date'],
+                    y=filtered_df[column],
+                    mode='lines',
+                    name=column.replace('generation ', '').title(),
+                    line=dict(width=2)
+                ))
+            
+            fig.update_layout(
+                title=f'Renewable Energy Generation - {time_resolution} ({chart_type})',
+                xaxis_title='Time',
+                yaxis_title='Generation (MW)',
+                template='plotly_dark',
+                hovermode='x unified'
+            )
+            
+        elif chart_type == "Stacked Area Chart":
+            fig = go.Figure()
+            
+            # Define colors for the stacked area chart
+            colors = px.colors.qualitative.Set3
+            
+            for i, column in enumerate(selected_columns):
+                fig.add_trace(go.Scatter(
+                    x=filtered_df['Date'],
+                    y=filtered_df[column],
+                    mode='lines',
+                    stackgroup='one',
+                    name=column.replace('generation ', '').title(),
+                    line=dict(width=0),
+                    fillcolor=colors[i % len(colors)]
+                ))
+            
+            fig.update_layout(
+                title=f'Renewable Energy Generation - {time_resolution} (Stacked Area)',
+                xaxis_title='Time',
+                yaxis_title='Generation (MW)',
+                template='plotly_dark'
+            )
+            
+        else:  # Pie Chart
+            # Calculate total generation for each selected column
+            totals = []
+            labels = []
+            
+            for column in selected_columns:
+                total = filtered_df[column].sum()
+                totals.append(total)
+                labels.append(column.replace('generation ', '').title())
+            
+            fig = px.pie(
+                values=totals,
+                names=labels,
+                title=f'Renewable Energy Mix - {time_resolution}'
+            )
+            fig.update_layout(template='plotly_dark')
+        
+        st.plotly_chart(fig, use_container_width=True)
+        
+        # Summary statistics
+        st.markdown('<h3 class="section-header">📊 Summary Statistics</h3>', unsafe_allow_html=True)
+        with st.expander("📈 View Summary Statistics", expanded=True):
+            cols = st.columns(len(selected_columns))
+            for i, column in enumerate(selected_columns):
+                with cols[i]:
+                    avg_generation = filtered_df[column].mean()
+                    total_generation = filtered_df[column].sum()
+                    max_generation = filtered_df[column].max()
+                    min_generation = filtered_df[column].min()
+                    st.markdown(f"""
+                    <div style='background: #23272f; border: 1px solid #2d323b; border-radius: 8px; padding: 1rem; margin: 0.5rem 0;'>
+                        <div style='text-align: center; font-size: 1.1rem; color: #f5f6fa; font-weight: 600; margin-bottom: 0.5rem;'>
+                            {column.replace('generation ', '').replace('generation fossil ', '').title()}
+                        </div>
+                        <div style='display: flex; justify-content: space-between;'>
+                            <div style='text-align: center;'>
+                                <span style='font-size: 1.2rem; color: #00b894; font-weight: bold;'>{avg_generation:.2f}</span>
+                                <span style='font-size: 0.7rem; color: #b2bec3; margin-left: 2px;'>MWh</span><br>
+                                <span style='font-size: 0.8rem; color: #b2bec3;'>Avg</span>
+                            </div>
+                            <div style='text-align: center;'>
+                                <span style='font-size: 1.2rem; color: #00b894; font-weight: bold;'>{total_generation:.2f}</span>
+                                <span style='font-size: 0.7rem; color: #b2bec3; margin-left: 2px;'>MWh</span><br>
+                                <span style='font-size: 0.8rem; color: #b2bec3;'>Total</span>
+                            </div>
+                        </div>
+                        <div style='display: flex; justify-content: space-between; margin-top: 0.5rem;'>
+                            <div style='text-align: center;'>
+                                <span style='font-size: 0.9rem; color: #f5f6fa; font-weight: 500;'>Max</span><br>
+                                <span style='font-size: 0.8rem; color: #b2bec3;'>{max_generation:.2f}</span>
+                                <span style='font-size: 0.7rem; color: #b2bec3; margin-left: 2px;'>MWh</span>
+                            </div>
+                            <div style='text-align: center;'>
+                                <span style='font-size: 0.9rem; color: #f5f6fa; font-weight: 500;'>Min</span><br>
+                                <span style='font-size: 0.8rem; color: #b2bec3;'>{min_generation:.2f}</span>
+                                <span style='font-size: 0.7rem; color: #b2bec3; margin-left: 2px;'>MWh</span>
+                            </div>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+    
+    elif analysis_type == "Non-Renewables":
+        st.markdown('<h2 class="section-header">🏭 Non-Renewable Energy Analysis</h2>', unsafe_allow_html=True)
+        
+        # Chart type selection
+        col1, col2 = st.columns(2)
+        with col1:
+            chart_type = st.selectbox("Chart Type:", ["Line Chart", "Stacked Area Chart", "Pie Chart"], key="nonrenewable_chart")
+        with col2:
+            time_resolution = st.selectbox("Time Resolution:", ["Daily", "Weekly", "Monthly"], key="nonrenewable_time")
+        
+        # Get the appropriate dataset and convert time to Date
+        if time_resolution == "Daily":
+            nonrenewable_df = energy_data['daily_nonrenewable']
+            # Date column already created in load_energy_data()
+        elif time_resolution == "Weekly":
+            nonrenewable_df = energy_data['weekly_nonrenewable']
+            # Convert weekly time format (e.g., "2015-W01") to datetime
+            def parse_iso_week(week_str):
+                year, week = week_str.split('-W')
+                # Create a datetime for the first day of the year, then add weeks
+                first_day = pd.Timestamp(year=int(year), month=1, day=1)
+                # Find the first Monday of the year
+                while first_day.weekday() != 0:  # Monday is 0
+                    first_day += pd.Timedelta(days=1)
+                # Add the weeks
+                return first_day + pd.Timedelta(weeks=int(week)-1)
+            
+            nonrenewable_df['Date'] = nonrenewable_df['time'].apply(parse_iso_week)
+        else:  # Monthly
+            nonrenewable_df = energy_data['monthly_nonrenewable']
+            # Convert monthly time format (e.g., "2015-01") to datetime
+            nonrenewable_df['Date'] = pd.to_datetime(nonrenewable_df['time'] + '-01', format='%Y-%m-%d')
+        
+        # Column selection
+        st.markdown('<h3 class="section-header">📋 Select Energy Sources</h3>', unsafe_allow_html=True)
+        
+        # Filter columns that exist in the dataset
+        available_columns = [col for col in NONRENEWABLE_COLUMNS if col in nonrenewable_df.columns]
+        
+        if not available_columns:
+            st.error("❌ No non-renewable energy columns found in the dataset.")
+            st.stop()
+        
+        # Initialize session state for selections
+        if 'nonrenewable_selections' not in st.session_state:
+            st.session_state.nonrenewable_selections = []
+        
+        # Add Select All and Clear All buttons
+        st.markdown("<br>", unsafe_allow_html=True)  # Add spacing to move buttons down
+        col1, col2, col3, col4 = st.columns([1, 1, 1, 1])
+        with col1:
+            if st.button("Select All", key="select_all_nonrenewable"):
+                st.session_state.nonrenewable_selections = available_columns.copy()
+                st.rerun()
+        with col2:
+            if st.button("Clear All", key="clear_all_nonrenewable"):
+                st.session_state.nonrenewable_selections = []
+                st.rerun()
+        with col3:
+            pass  # Empty column for symmetry
+        with col4:
+            pass  # Empty column for symmetry
+        
+        # Use a more organized grid layout for checkboxes
+        if len(available_columns) <= 6:
+            # For 6 or fewer columns, use 3 columns
+            col1, col2, col3 = st.columns(3)
+            
+            for i, column in enumerate(available_columns):
+                with [col1, col2, col3][i % 3]:
+                    is_checked = column in st.session_state.nonrenewable_selections
+                    if st.checkbox(column.replace('generation fossil ', '').title(), 
+                                 value=is_checked, 
+                                 key=f"nonrenewable_{i}"):
+                        if column not in st.session_state.nonrenewable_selections:
+                            st.session_state.nonrenewable_selections.append(column)
+                    else:
+                        if column in st.session_state.nonrenewable_selections:
+                            st.session_state.nonrenewable_selections.remove(column)
+        else:
+            # For more than 6 columns, use 4 columns
+            col1, col2, col3, col4 = st.columns(4)
+            
+            for i, column in enumerate(available_columns):
+                with [col1, col2, col3, col4][i % 4]:
+                    is_checked = column in st.session_state.nonrenewable_selections
+                    if st.checkbox(column.replace('generation fossil ', '').title(), 
+                                 value=is_checked, 
+                                 key=f"nonrenewable_{i}"):
+                        if column not in st.session_state.nonrenewable_selections:
+                            st.session_state.nonrenewable_selections.append(column)
+                    else:
+                        if column in st.session_state.nonrenewable_selections:
+                            st.session_state.nonrenewable_selections.remove(column)
+        
+        selected_columns = st.session_state.nonrenewable_selections
+        
+        if not selected_columns:
+            st.warning("⚠️ Please select at least one energy source to analyze.")
+            st.stop()
+        
+        # Filter data by date range
+        mask = (nonrenewable_df['Date'] >= pd.to_datetime(start_date)) & (nonrenewable_df['Date'] <= pd.to_datetime(end_date))
+        filtered_df = nonrenewable_df.loc[mask]
+        
+        # Create visualizations
+        if chart_type == "Line Chart":
+            fig = go.Figure()
+            
+            for column in selected_columns:
+                fig.add_trace(go.Scatter(
+                    x=filtered_df['Date'],
+                    y=filtered_df[column],
+                    mode='lines',
+                    name=column.replace('generation fossil ', '').title(),
+                    line=dict(width=2)
+                ))
+            
+            fig.update_layout(
+                title=f'Non-Renewable Energy Generation - {time_resolution} ({chart_type})',
+                xaxis_title='Time',
+                yaxis_title='Generation (MW)',
+                template='plotly_dark',
+                hovermode='x unified'
+            )
+            
+        elif chart_type == "Stacked Area Chart":
+            fig = go.Figure()
+            
+            # Define colors for the stacked area chart
+            colors = px.colors.qualitative.Set3
+            
+            for i, column in enumerate(selected_columns):
+                fig.add_trace(go.Scatter(
+                    x=filtered_df['Date'],
+                    y=filtered_df[column],
+                    mode='lines',
+                    stackgroup='one',
+                    name=column.replace('generation fossil ', '').title(),
+                    line=dict(width=0),
+                    fillcolor=colors[i % len(colors)]
+                ))
+            
+            fig.update_layout(
+                title=f'Non-Renewable Energy Generation - {time_resolution} (Stacked Area)',
+                xaxis_title='Time',
+                yaxis_title='Generation (MW)',
+                template='plotly_dark'
+            )
+            
+        else:  # Pie Chart
+            # Calculate total generation for each selected column
+            totals = []
+            labels = []
+            
+            for column in selected_columns:
+                total = filtered_df[column].sum()
+                totals.append(total)
+                labels.append(column.replace('generation fossil ', '').title())
+            
+            fig = px.pie(
+                values=totals,
+                names=labels,
+                title=f'Non-Renewable Energy Mix - {time_resolution}'
+            )
+            fig.update_layout(template='plotly_dark')
+        
+        st.plotly_chart(fig, use_container_width=True)
+        
+        # Summary statistics
+        st.markdown('<h3 class="section-header">📊 Summary Statistics</h3>', unsafe_allow_html=True)
+        with st.expander("📈 View Summary Statistics", expanded=True):
+            cols = st.columns(len(selected_columns))
+            for i, column in enumerate(selected_columns):
+                with cols[i]:
+                    avg_generation = filtered_df[column].mean()
+                    total_generation = filtered_df[column].sum()
+                    max_generation = filtered_df[column].max()
+                    min_generation = filtered_df[column].min()
+                    st.markdown(f"""
+                    <div style='background: #23272f; border: 1px solid #2d323b; border-radius: 8px; padding: 1rem; margin: 0.5rem 0;'>
+                        <div style='text-align: center; font-size: 1.1rem; color: #f5f6fa; font-weight: 600; margin-bottom: 0.5rem;'>
+                            {column.replace('generation fossil ', '').replace('generation ', '').title()}
+                        </div>
+                        <div style='display: flex; justify-content: space-between;'>
+                            <div style='text-align: center;'>
+                                <span style='font-size: 1.2rem; color: #00b894; font-weight: bold;'>{avg_generation:.2f}</span>
+                                <span style='font-size: 0.7rem; color: #b2bec3; margin-left: 2px;'>MWh</span><br>
+                                <span style='font-size: 0.8rem; color: #b2bec3;'>Avg</span>
+                            </div>
+                            <div style='text-align: center;'>
+                                <span style='font-size: 1.2rem; color: #00b894; font-weight: bold;'>{total_generation:.2f}</span>
+                                <span style='font-size: 0.7rem; color: #b2bec3; margin-left: 2px;'>MWh</span><br>
+                                <span style='font-size: 0.8rem; color: #b2bec3;'>Total</span>
+                            </div>
+                        </div>
+                        <div style='display: flex; justify-content: space-between; margin-top: 0.5rem;'>
+                            <div style='text-align: center;'>
+                                <span style='font-size: 0.9rem; color: #f5f6fa; font-weight: 500;'>Max</span><br>
+                                <span style='font-size: 0.8rem; color: #b2bec3;'>{max_generation:.2f}</span>
+                                <span style='font-size: 0.7rem; color: #b2bec3; margin-left: 2px;'>MWh</span>
+                            </div>
+                            <div style='text-align: center;'>
+                                <span style='font-size: 0.9rem; color: #f5f6fa; font-weight: 500;'>Min</span><br>
+                                <span style='font-size: 0.8rem; color: #b2bec3;'>{min_generation:.2f}</span>
+                                <span style='font-size: 0.7rem; color: #b2bec3; margin-left: 2px;'>MWh</span>
+                            </div>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+    
+    else:  # Fossil Fuel Dependency
+        st.markdown('<h2 class="section-header">🛢️ Fossil Fuel Dependency Analysis</h2>', unsafe_allow_html=True)
+        
+        # Chart type selection
+        col1, col2 = st.columns(2)
+        with col1:
+            chart_type = st.selectbox("Chart Type:", ["Bar Chart", "Pie Chart", "Heatmap"], key="fossil_chart")
+        with col2:
+            analysis_type = st.selectbox("Analysis Type:", ["Dependency Percentages", "Average Values", "Count Analysis"], key="fossil_analysis")
+        
+        # Get the fossil fuel dependency dataset
+        fossil_df = energy_data['fossil_fuel_dependency']
+        
+        # Column selection based on analysis type
+        st.markdown('<h3 class="section-header">📋 Select Metrics</h3>', unsafe_allow_html=True)
+        
+        if analysis_type == "Dependency Percentages":
+            available_columns = ['fossilDependencyPercent', 'brownCoalPercent', 'coalGasPercent', 
+                               'naturalGasPercent', 'hardCoalPercent', 'oilPercent']
+            display_names = ['Fossil Dependency %', 'Brown Coal %', 'Coal Gas %', 
+                           'Natural Gas %', 'Hard Coal %', 'Oil %']
+        elif analysis_type == "Average Values":
+            available_columns = ['avgLoad', 'avgTotalFossil', 'avgTotalGeneration', 
+                               'avgBrownCoal', 'avgCoalGas', 'avgNaturalGas', 'avgHardCoal', 'avgOil', 'avgOilShale', 'avgPeat']
+            display_names = ['Avg Load', 'Avg Total Fossil', 'Avg Total Generation', 
+                           'Avg Brown Coal', 'Avg Coal Gas', 'Avg Natural Gas', 'Avg Hard Coal', 'Avg Oil', 'Avg Oil Shale', 'Avg Peat']
+        else:  # Count Analysis
+            available_columns = ['count']
+            display_names = ['Data Count']
+        
+        # Filter columns that exist in the dataset
+        existing_columns = [col for col in available_columns if col in fossil_df.columns]
+        existing_display_names = [display_names[i] for i, col in enumerate(available_columns) if col in fossil_df.columns]
+        
+        if not existing_columns:
+            st.error("❌ No fossil fuel dependency columns found in the dataset.")
+            st.stop()
+        
+        # Initialize session state for selections
+        if 'fossil_selections' not in st.session_state:
+            st.session_state.fossil_selections = []
+        
+        # Add Select All and Clear All buttons
+        st.markdown("<br>", unsafe_allow_html=True)  # Add spacing to move buttons down
+        col1, col2, col3, col4 = st.columns([1, 1, 1, 1])
+        with col1:
+            if st.button("Select All", key="select_all_fossil"):
+                st.session_state.fossil_selections = existing_columns.copy()
+                st.rerun()
+        with col2:
+            if st.button("Clear All", key="clear_all_fossil"):
+                st.session_state.fossil_selections = []
+                st.rerun()
+        with col3:
+            pass  # Empty column for symmetry
+        with col4:
+            pass  # Empty column for symmetry
+        
+        # Use a more organized grid layout for checkboxes
+        if len(existing_columns) <= 6:
+            # For 6 or fewer columns, use 3 columns
+            col1, col2, col3 = st.columns(3)
+            
+            for i, (column, display_name) in enumerate(zip(existing_columns, existing_display_names)):
+                with [col1, col2, col3][i % 3]:
+                    is_checked = column in st.session_state.fossil_selections
+                    if st.checkbox(display_name, 
+                                 value=is_checked, 
+                                 key=f"fossil_{i}"):
+                        if column not in st.session_state.fossil_selections:
+                            st.session_state.fossil_selections.append(column)
+                    else:
+                        if column in st.session_state.fossil_selections:
+                            st.session_state.fossil_selections.remove(column)
+        else:
+            # For more than 6 columns, use 4 columns
+            col1, col2, col3, col4 = st.columns(4)
+            
+            for i, (column, display_name) in enumerate(zip(existing_columns, existing_display_names)):
+                with [col1, col2, col3, col4][i % 4]:
+                    is_checked = column in st.session_state.fossil_selections
+                    if st.checkbox(display_name, 
+                                 value=is_checked, 
+                                 key=f"fossil_{i}"):
+                        if column not in st.session_state.fossil_selections:
+                            st.session_state.fossil_selections.append(column)
+                    else:
+                        if column in st.session_state.fossil_selections:
+                            st.session_state.fossil_selections.remove(column)
+        
+        selected_columns = st.session_state.fossil_selections
+        
+        if not selected_columns:
+            st.warning("⚠️ Please select at least one metric to analyze.")
+            st.stop()
+        
+        # Create visualizations
+        if chart_type == "Bar Chart":
+            fig = go.Figure()
+            
+            for column in selected_columns:
+                display_name = existing_display_names[existing_columns.index(column)]
+                fig.add_trace(go.Bar(
+                    x=fossil_df['time'],
+                    y=fossil_df[column],
+                    name=display_name,
+                    text=fossil_df[column].round(2),
+                    textposition='auto'
+                ))
+            
+            fig.update_layout(
+                title=f'Fossil Fuel Dependency - {analysis_type} (Bar Chart)',
+                xaxis_title='Season & Load Level',
+                yaxis_title='Value',
+                template='plotly_dark',
+                barmode='group'
+            )
+            
+        elif chart_type == "Pie Chart":
+            # Calculate average values across all seasons for each selected column
+            fig = go.Figure()
+            
+            for column in selected_columns:
+                display_name = existing_display_names[existing_columns.index(column)]
+                avg_value = fossil_df[column].mean()
+                
+                fig.add_trace(go.Pie(
+                    labels=[display_name],
+                    values=[avg_value],
+                    name=display_name,
+                    hole=0.3
+                ))
+            
+            fig.update_layout(
+                title=f'Average Fossil Fuel Dependency - {analysis_type}',
+                template='plotly_dark'
+            )
+            
+        else:  # Heatmap
+            # Create a heatmap of selected columns across all time periods
+            heatmap_data = fossil_df[selected_columns].values
+            heatmap_labels = [existing_display_names[existing_columns.index(col)] for col in selected_columns]
+            
+            # Convert to numpy array and round the values
+            heatmap_data_np = np.array(heatmap_data)
+            heatmap_data_rounded = np.round(heatmap_data_np, 2)
+            
+            fig = go.Figure(data=go.Heatmap(
+                z=heatmap_data_rounded,
+                x=heatmap_labels,
+                y=fossil_df['time'],
+                colorscale='Viridis',
+                text=heatmap_data_rounded,
+                texttemplate="%{text}",
+                textfont={"size": 10},
+                hoverongaps=False
+            ))
+            
+            fig.update_layout(
+                title=f'Fossil Fuel Dependency Heatmap - {analysis_type}',
+                xaxis_title='Metrics',
+                yaxis_title='Season & Load Level',
+                template='plotly_dark'
+            )
+        
+        st.plotly_chart(fig, use_container_width=True)
+        
+        # Summary statistics
+        st.markdown('<h3 class="section-header">📊 Summary Statistics</h3>', unsafe_allow_html=True)
+        with st.expander("📈 View Summary Statistics", expanded=True):
+            cols = st.columns(len(selected_columns))
+            for i, column in enumerate(selected_columns):
+                with cols[i]:
+                    avg_generation = fossil_df[column].mean()
+                    total_generation = fossil_df[column].sum()
+                    max_generation = fossil_df[column].max()
+                    min_generation = fossil_df[column].min()
+                    display_name = existing_display_names[existing_columns.index(column)]
+                    st.markdown(f"""
+                    <div style='background: #23272f; border: 1px solid #2d323b; border-radius: 8px; padding: 1rem; margin: 0.5rem 0;'>
+                        <div style='text-align: center; font-size: 1.1rem; color: #f5f6fa; font-weight: 600; margin-bottom: 0.5rem;'>
+                            {display_name}
+                        </div>
+                        <div style='display: flex; justify-content: space-between;'>
+                            <div style='text-align: center;'>
+                                <span style='font-size: 1.2rem; color: #00b894; font-weight: bold;'>{avg_generation:.2f}</span>
+                                <span style='font-size: 0.7rem; color: #b2bec3; margin-left: 2px;'>MWh</span><br>
+                                <span style='font-size: 0.8rem; color: #b2bec3;'>Avg</span>
+                            </div>
+                            <div style='text-align: center;'>
+                                <span style='font-size: 1.2rem; color: #00b894; font-weight: bold;'>{total_generation:.2f}</span>
+                                <span style='font-size: 0.7rem; color: #b2bec3; margin-left: 2px;'>MWh</span><br>
+                                <span style='font-size: 0.8rem; color: #b2bec3;'>Total</span>
+                            </div>
+                        </div>
+                        <div style='display: flex; justify-content: space-between; margin-top: 0.5rem;'>
+                            <div style='text-align: center;'>
+                                <span style='font-size: 0.9rem; color: #f5f6fa; font-weight: 500;'>Max</span><br>
+                                <span style='font-size: 0.8rem; color: #b2bec3;'>{max_generation:.2f}</span>
+                                <span style='font-size: 0.7rem; color: #b2bec3; margin-left: 2px;'>MWh</span>
+                            </div>
+                            <div style='text-align: center;'>
+                                <span style='font-size: 0.9rem; color: #f5f6fa; font-weight: 500;'>Min</span><br>
+                                <span style='font-size: 0.8rem; color: #b2bec3;'>{min_generation:.2f}</span>
+                                <span style='font-size: 0.7rem; color: #b2bec3; margin-left: 2px;'>MWh</span>
+                            </div>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+
+# ML ANALYSIS PAGE
+# ML ANALYSIS PAGE
+elif page == "👾 ML Analysis":
+    st.markdown('<h1 class="main-header">👾 Machine Learning Analysis</h1>', unsafe_allow_html=True)
+    
+    st.markdown("""
+<h2>Vision for an Intelligent Grid</h2>
+<ul>
+    <li>Autonomous system capable of <strong>real-time monitoring and forecasting</strong>.</li>
+    <li>Dynamically balances energy supply by:
+        <ul>
+            <li>Predicting shortfalls in renewable energy</li>
+            <li>Seamlessly switching to backup sources</li>
+        </ul>
+    </li>
+    <li>Optimizes for:
+        <ul>
+            <li>Cost efficiency</li>
+            <li>Reduced carbon emissions</li>
+            <li>Grid reliability</li>
+        </ul>
+    </li>
+    <li>Utilizes <strong>machine learning</strong> and data-driven algorithms to continuously enhance decision-making.</li>
+</ul>
+
+<h3>Current Gaps</h3>
+<ul>
+    <li>Lack of <strong>adaptive, predictive, and automated control systems</strong>.</li>
+    <li>Existing systems are reactive and manual, failing to:
+        <ul>
+            <li>Anticipate renewable variability</li>
+            <li>Make proactive adjustments</li>
+        </ul>
+    </li>
+    <li>Results in:
+        <ul>
+            <li>Operational inefficiencies</li>
+            <li>Higher carbon emissions</li>
+            <li>Increased risk of outages</li>
+        </ul>
+    </li>
+    <li>Hinders progress toward a <strong>sustainable and reliable energy future</strong>.</li>
+</ul>
+""", unsafe_allow_html=True)
+    
+    # Forecast selection
+    st.markdown('<h2 class="section-header">🔮 Forecast Selection</h2>', unsafe_allow_html=True)
+    
+    col1, col2 = st.columns([1, 1])
+    
+    with col1:
+        forecast_type = st.selectbox(
+            "Choose Forecast Type:",
+            ["Load Forecast", "Need vs Actual"]
+        )
+    
+    with col2:
+        metric_type = st.selectbox(
+            "Select Metrics:",
+            ["RMSE", "MAE", "MAPE", "R²", "All Metrics"]
+        )
+    
+    # Time range selection - different for different forecast types
+    if forecast_type == "Load Forecast":
+        col1, col2 = st.columns(2)
+        with col1:
+            start_date = st.date_input("Start Date", datetime(2015, 1, 1))
+        with col2:
+            end_date = st.date_input("End Date", datetime(2018, 12, 31))
+        
+        # Validate date range for Load Forecast
+        min_date = datetime(2015, 1, 1).date()
+        max_date = datetime(2018, 12, 31).date()
+        
+        if start_date < min_date or end_date > max_date or start_date > max_date or end_date < min_date:
+            st.markdown("""
+            <div style="background-color: #ff4444; color: white; padding: 1rem; border-radius: 8px; margin: 1rem 0;">
+                <strong>⚠️ Invalid Date Range</strong><br>
+                Please choose dates between <strong>01/01/2015</strong> and <strong>31/12/2018</strong>
+            </div>
+            """, unsafe_allow_html=True)
+            st.stop()
+        
+        # Validate that start_date is before end_date
+        if start_date >= end_date:
+            st.markdown("""
+            <div style="background-color: #ff4444; color: white; padding: 1rem; border-radius: 8px; margin: 1rem 0;">
+                <strong>⚠️ Invalid Date Range</strong><br>
+                Start date must be <strong>before</strong> end date
+            </div>
+            """, unsafe_allow_html=True)
+            st.stop()
+        
+        # Handle Load Forecast data
+        ml_load_data['Date'] = pd.to_datetime(ml_load_data['Date'], format='%d-%m-%y')
+        ml_load_data = ml_load_data.sort_values('Date')
+        
+        mask = (ml_load_data['Date'] >= pd.to_datetime(start_date)) & (ml_load_data['Date'] <= pd.to_datetime(end_date))
+        filtered_data = ml_load_data.loc[mask]
+        
+        # Actual vs Predicted Plot for Load Forecast
+        st.markdown('<h2 class="section-header">📈 Actual vs Predicted Analysis</h2>', unsafe_allow_html=True)
+        
+        fig = make_subplots(
+            rows=2, cols=1,
+            subplot_titles=('Actual vs Predicted Load', 'Prediction Error'),
+            vertical_spacing=0.1
+        )
+        
+        # Main plot
+        fig.add_trace(
+            go.Scatter(x=filtered_data['Date'], y=filtered_data['Actual_Load'], 
+                      name='Actual Load', line=dict(color='#1f77b4', width=2)),
+            row=1, col=1
+        )
+        fig.add_trace(
+            go.Scatter(x=filtered_data['Date'], y=filtered_data['Predicted_Load'], 
+                      name='Predicted Load', line=dict(color='#ff7f0e', width=2)),
+            row=1, col=1
+        )
+        
+        # Error plot
+        error = filtered_data['Actual_Load'] - filtered_data['Predicted_Load']
+        fig.add_trace(
+            go.Scatter(x=filtered_data['Date'], y=error, 
+                      name='Prediction Error', line=dict(color='#d62728', width=1)),
+            row=2, col=1
+        )
+        
+        fig.update_layout(
+            height=600,
+            template='plotly_dark',
+            title_text=f"{forecast_type} - Performance Analysis",
+            showlegend=True
+        )
+        
+        st.plotly_chart(fig, use_container_width=True)
+        
+        # Metrics display for Load Forecast
+        st.markdown('<h2 class="section-header">📊 Performance Metrics</h2>', unsafe_allow_html=True)
+        
+        # Calculate metrics
+        rmse = np.sqrt(np.mean((filtered_data['Actual_Load'] - filtered_data['Predicted_Load'])**2))
+        mae = np.mean(np.abs(filtered_data['Actual_Load'] - filtered_data['Predicted_Load']))
+        mape = np.mean(np.abs((filtered_data['Actual_Load'] - filtered_data['Predicted_Load']) / filtered_data['Actual_Load'])) * 100
+        r2 = np.corrcoef(filtered_data['Actual_Load'], filtered_data['Predicted_Load'])[0,1]**2
+        
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            st.metric("RMSE", f"{rmse:.2f}", "MWh")
+        with col2:
+            st.metric("MAE", f"{mae:.2f}", "MWh")
+        with col3:
+            st.metric("MAPE", f"{mape:.2f}", "%")
+        with col4:
+            st.metric("R² Score", f"{r2:.3f}", "")
+    
+    elif forecast_type == "Need vs Actual":
+        # Load energy data for Need vs Actual analysis
+        try:
+            energy_data_df = pd.read_csv('./data/energy_data.csv')
+            
+            # Create hourly timestamp from 1st Jan 2015 12 AM to 31st Dec 2016 11 PM
+            start_timestamp = pd.Timestamp('2015-01-01 00:00:00')
+            end_timestamp = pd.Timestamp('2018-12-31 23:00:00')
+            hourly_timestamps = pd.date_range(start=start_timestamp, end=end_timestamp, freq='H')
+            
+            # Ensure we have the right number of rows
+            if len(energy_data_df) != len(hourly_timestamps):
+                st.warning(f"⚠️ Data length mismatch: CSV has {len(energy_data_df)} rows, expected {len(hourly_timestamps)} hours")
+                # Take only the available data
+                min_length = min(len(energy_data_df), len(hourly_timestamps))
+                energy_data_df = energy_data_df.iloc[:min_length]
+                hourly_timestamps = hourly_timestamps[:min_length]
+            
+            # Add timestamp column
+            energy_data_df['timestamp'] = hourly_timestamps
+            
+            # Check if required columns exist
+            if 'total load actual' not in energy_data_df.columns or 'total load present' not in energy_data_df.columns:
+                st.error("❌ Required columns 'total load actual' and 'total load present' not found in the dataset.")
+                available_cols = list(energy_data_df.columns)
+                st.write("Available columns:", available_cols)
+                st.stop()
+            
+            # Date range selection for Need vs Actual
+            col1, col2 = st.columns(2)
+            with col1:
+                start_date_nva = st.date_input("Start Date", datetime(2015, 1, 1), key="nva_start")
+            with col2:
+                end_date_nva = st.date_input("End Date", datetime(2018, 12, 31), key="nva_end")
+            
+            # Validate date range for Need vs Actual
+            min_date_nva = datetime(2015, 1, 1).date()
+            max_date_nva = datetime(2018, 12, 31).date()
+            
+            if start_date_nva < min_date_nva or end_date_nva > max_date_nva or start_date_nva > max_date_nva or end_date_nva < min_date_nva:
+                st.markdown("""
+                <div style="background-color: #ff4444; color: white; padding: 1rem; border-radius: 8px; margin: 1rem 0;">
+                    <strong>⚠️ Invalid Date Range</strong><br>
+                    Please choose dates between <strong>01/01/2015</strong> and <strong>31/12/2018</strong>
+                </div>
+                """, unsafe_allow_html=True)
+                st.stop()
+            
+            if start_date_nva >= end_date_nva:
+                st.markdown("""
+                <div style="background-color: #ff4444; color: white; padding: 1rem; border-radius: 8px; margin: 1rem 0;">
+                    <strong>⚠️ Invalid Date Range</strong><br>
+                    Start date must be <strong>before</strong> end date
+                </div>
+                """, unsafe_allow_html=True)
+                st.stop()
+            
+            # Filter data by date range
+            mask_nva = (energy_data_df['timestamp'].dt.date >= start_date_nva) & (energy_data_df['timestamp'].dt.date <= end_date_nva)
+            filtered_energy_data = energy_data_df.loc[mask_nva]
+            
+            # Need vs Actual Plot
+            st.markdown('<h2 class="section-header">📈 Need vs Actual Load Analysis</h2>', unsafe_allow_html=True)
+            
+            fig_nva = make_subplots(
+                rows=2, cols=1,
+                subplot_titles=('Total Load: Actual vs Forecast', 'Load Difference (Actual - Forecast)'),
+                vertical_spacing=0.1
+            )
+            
+            # Main plot
+            fig_nva.add_trace(
+                go.Scatter(x=filtered_energy_data['timestamp'], y=filtered_energy_data['total load actual'], 
+                          name='Total Load Demand', line=dict(color='#1f77b4', width=2)),
+                row=1, col=1
+            )
+            fig_nva.add_trace(
+                go.Scatter(x=filtered_energy_data['timestamp'], y=filtered_energy_data['total load present'], 
+                          name='Total Load Generated', line=dict(color='#ff7f0e', width=2)),
+                row=1, col=1
+            )
+            
+            # Difference plot
+            load_difference = filtered_energy_data['total load actual'] - filtered_energy_data['total load present']
+            fig_nva.add_trace(
+                go.Scatter(x=filtered_energy_data['timestamp'], y=load_difference, 
+                          name='Load Difference', line=dict(color='#d62728', width=1)),
+                row=2, col=1
+            )
+            
+            fig_nva.update_layout(
+                height=600,
+                template='plotly_dark',
+                title_text="Need vs Actual - Hourly Load Analysis",
+                showlegend=True
+            )
+            
+            fig_nva.update_xaxes(title_text="Timestamp", row=2, col=1)
+            fig_nva.update_yaxes(title_text="Load (MW)", row=1, col=1)
+            fig_nva.update_yaxes(title_text="Difference (MW)", row=2, col=1)
+            
+            st.plotly_chart(fig_nva, use_container_width=True)
+            
+            # Metrics display for Need vs Actual
+            st.markdown('<h2 class="section-header">📊 Performance Metrics</h2>', unsafe_allow_html=True)
+            
+            # Calculate metrics
+            rmse_nva = np.sqrt(np.mean((filtered_energy_data['total load actual'] - filtered_energy_data['total load present'])**2))
+            mae_nva = np.mean(np.abs(filtered_energy_data['total load actual'] - filtered_energy_data['total load present']))
+            mape_nva = np.mean(np.abs((filtered_energy_data['total load actual'] - filtered_energy_data['total load present']) / filtered_energy_data['total load actual'])) * 100
+            r2_nva = np.corrcoef(filtered_energy_data['total load actual'], filtered_energy_data['total load present'])[0,1]**2
+            
+            col1, col2, col3, col4 = st.columns(4)
+            
+            with col1:
+                st.metric("RMSE", f"{rmse_nva:.2f}", "MW")
+            with col2:
+                st.metric("MAE", f"{mae_nva:.2f}", "MW")
+            with col3:
+                st.metric("MAPE", f"{mape_nva:.2f}", "%")
+            with col4:
+                st.metric("R² Score", f"{r2_nva:.3f}", "")
+            
+            # Additional statistics
+            st.markdown('<h3 class="section-header">📋 Additional Statistics</h3>', unsafe_allow_html=True)
+            
+            col1, col2, col3, col4 = st.columns(4)
+            
+            with col1:
+                avg_actual = filtered_energy_data['total load actual'].mean()
+                st.metric("Avg Actual Load", f"{avg_actual:.2f}", "MW")
+            with col2:
+                avg_forecast = filtered_energy_data['total load present'].mean()
+                st.metric("Avg Forecast Load", f"{avg_forecast:.2f}", "MW")
+            with col3:
+                max_difference = load_difference.max()
+                st.metric("Max Over-forecast", f"{max_difference:.2f}", "MW")
+            with col4:
+                min_difference = load_difference.min()
+                st.metric("Max Under-forecast", f"{abs(min_difference):.2f}", "MW")
+        
+        except FileNotFoundError:
+            st.error("❌ Energy data file not found at './data/energy_data.csv'. Please ensure the file exists.")
+        except Exception as e:
+            st.error(f"❌ Error loading energy data: {str(e)}")
+
+elif page == "🖥️ System Monitor":
+    display_system_monitor()
+
+# Footer
+st.markdown("---")
+st.markdown("""
+<div style='text-align: center; color: #666; padding: 2rem;'>
+    <p>⚡ Energy Analysis & Forecasting Platform | Built with Streamlit</p>
+    <p>📊 Advanced Analytics • 👾 Machine Learning • 🌱 Sustainable Energy</p>
+</div>
+""", unsafe_allow_html=True)
