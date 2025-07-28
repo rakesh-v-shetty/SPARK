@@ -1,0 +1,7 @@
+Link- https://drive.google.com/drive/folders/1jyHSZeRR3lKNyxbro2g1tNmrOhMLR9Ps?usp=drive_link
+
+extract "devcontainer.zip" and put it in ".devcontainer" folder in the main folder
+
+extract "git_files.zip" and put it in the main folder
+
+"OpenHardwareMonitor" folder contains the monitoring application
