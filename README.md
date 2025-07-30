@@ -1,6 +1,14 @@
 # ⚡ SPARK — Sustainable Power Analytics and Renewable Kinetics
 [![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://spark-sustainable-power-analytics-and-renewable-kinetics.streamlit.app)
 
+![Apache Hadoop](https://img.shields.io/badge/Apache%20Hadoop-MapReduce-66CCFF.svg?logo=apache&logoColor=black)
+![Apache Spark](https://img.shields.io/badge/Apache%20Spark-ML-E25A1C.svg?logo=apache-spark&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3.x-blue.svg?logo=python&logoColor=white)
+![Streamlit](https://img.shields.io/badge/Streamlit-App-FF4B4B.svg?logo=streamlit&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-Containerization-2496ED.svg?logo=docker&logoColor=white)
+![Jupyter](https://img.shields.io/badge/Jupyter-Notebook-F37626.svg?logo=jupyter&logoColor=white)
+![Scikit-learn](https://img.shields.io/badge/scikit--learn-%23F7931E.svg?logo=scikit-learn&logoColor=white)
+
 **Big Data Energy Analytics with Hadoop MapReduce and Apache Spark ML**
 
 ---
